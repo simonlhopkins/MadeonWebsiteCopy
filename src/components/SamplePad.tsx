@@ -27,17 +27,7 @@ export default function SamplePad({
 
   useEffect(() => {
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
-      (currentState, time, loopDuration) => {
-        // anime({
-        //   targets: padRef.current,
-        //   boxShadow: [
-        //     "0 0 0 0px rgba(0, 0, 0, 0.2)",
-        //     "0 0 0 20px rgba(0, 0, 0, 0)",
-        //   ],
-        //   duration: (loopDuration / 8) * 1000, // Duration of the animation in milliseconds
-        //   easing: "easeOut", // Easing function for smooth animation
-        //   loop: 8,
-        // });
+      (currentState, _time, loopDuration) => {
         if (!isSamplePadStateEmpty(currentState)) {
           const keyframes = [
             { boxShadow: "0 0 0 0px rgba(255, 255, 255, 1)" },

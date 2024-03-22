@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import styled, { keyframes } from "styled-components";
+import styled from "styled-components";
 import {
   MadeonSamplePadInstance,
   PadConfig,
@@ -33,7 +33,7 @@ export default function Pad({
     //if we rely on the active prop, that will be updated ms after the loop already happened, so we would
     //miss the first iteration of the loop
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
-      (currentState, time, loopDuration) => {
+      (currentState, _time, loopDuration) => {
         const actuallyActive = samplePadStateContainsPadConfig(
           currentState,
           padConfig
@@ -115,15 +115,6 @@ export default function Pad({
     </StyledPad>
   );
 }
-
-const pulseAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 0 0px rgba(255, 0, 0, 1);
-  }
-  100% {
-    box-shadow: 0 0 0 80px rgba(0, 0, 0, 0);
-  }
-`;
 
 const StyledPad = styled.div<{ $padType: PadType; $animLength: number }>`
   position: relative;
