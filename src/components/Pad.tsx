@@ -22,7 +22,6 @@ type PadProps = {
 export default function Pad({
   active,
   queued,
-  debugText,
   padConfig,
   onPadClick,
 }: PadProps) {
