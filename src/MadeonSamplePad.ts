@@ -1,6 +1,5 @@
 import * as Tone from "tone";
 import { applyQueuedStateToExistingState } from "./Util";
-
 export type SampleLoopCallbackType = (
   currentSamples: SamplePadState,
   time: number,
@@ -49,13 +48,29 @@ export default class MadeonSamplePad {
 
   constructor() {}
 
+  async createPlayer(url: string): Promise<Tone.Player> {
+    return new Promise((resolve, reject) => {
+      const player: Tone.Player = new Tone.Player({
+        onerror: (err) => reject(err),
+        onload: () => resolve(player as Tone.Player),
+        url: url,
+      });
+    });
+  }
+
   async loadSamples() {
-    const loadSoundArr = (type: string, num: number) => {
+    const loadSoundArr = async (type: string, num: number) => {
       const ret = [];
       for (let i = 1; i < num + 1; i++) {
-        let newPlayer = new Tone.Player(
-          `sounds/${type}.1.${i}.ogg`
-        ).toDestination();
+        let newPlayer = await this.createPlayer(`sounds/ogg/${type}.1.${i}.ogg`)
+          .then((result) => result.toDestination())
+          .catch((e) => {
+            console.log("error loading ogg files, using mp3");
+            return this.createPlayer(`sounds/mp3/${type}.1.${i}.mp3`).then(
+              (result) => result.toDestination()
+            );
+          });
+
         // newPlayer.fadeOut = 0.05;
         // newPlayer.fadeIn = 0.05;
         ret.push(newPlayer);
@@ -63,9 +78,9 @@ export default class MadeonSamplePad {
       return ret;
     };
 
-    this.drumSamples = loadSoundArr("drum", 10);
-    this.bassSamples = loadSoundArr("bass", 10);
-    this.soundSamples = loadSoundArr("sounds", 16);
+    this.drumSamples = await loadSoundArr("drum", 10);
+    this.bassSamples = await loadSoundArr("bass", 10);
+    this.soundSamples = await loadSoundArr("sounds", 16);
 
     await Tone.loaded();
   }
@@ -151,10 +166,15 @@ export default class MadeonSamplePad {
       console.log("Madeon Sample Pad Already initialized");
       return;
     }
+    console.log("initializings");
     this.initialized = true;
+    console.log("starting tone");
     await Tone.start();
+    await Tone.context.resume();
+    console.log("loading samples");
     await this.loadSamples();
 
+    console.log("samples loaded");
     Tone.Transport.scheduleRepeat(
       (time) => {
         this.onSampleLoop(time, Tone.Transport.toSeconds("2m"));
