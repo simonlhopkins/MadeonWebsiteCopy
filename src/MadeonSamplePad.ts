@@ -1,5 +1,7 @@
 import * as Tone from "tone";
 import { applyQueuedStateToExistingState } from "./Util";
+
+//types
 export type SampleLoopCallbackType = (
   currentSamples: SamplePadState,
   time: number,
@@ -22,7 +24,7 @@ export type PadConfig = {
   index: number;
 };
 
-export default class MadeonSamplePad {
+class MadeonSamplePad {
   private drumSamples: Tone.Player[] = [];
   private bassSamples: Tone.Player[] = [];
   private soundSamples: Tone.Player[] = [];
@@ -41,12 +43,13 @@ export default class MadeonSamplePad {
     bass: [],
     sounds: [],
   };
-  currentSamples: Tone.Player[] = [];
   bpm: number = 110;
   initialized = false;
   debugCurrentlyPlaying: PadConfig | null = null;
 
-  constructor() {}
+  constructor() {
+    document.addEventListener("visibilitychange", () => {});
+  }
 
   async createPlayer(url: string): Promise<Tone.Player> {
     return new Promise((resolve, reject) => {
@@ -134,6 +137,7 @@ export default class MadeonSamplePad {
     //this.currentState is updated now
 
     this.sampleLoopCallbackMap.forEach((callback) => {
+      //pass a copy of the state to each of them
       callback({ ...this.currentState }, time, loopDuration);
     });
 
@@ -189,4 +193,6 @@ export default class MadeonSamplePad {
   }
 }
 
+//Singleton :( this works for a small project like this :) Maybe can make a member of the App Component as a ref or something.
+//I need to reference it in Pad and in App
 export const MadeonSamplePadInstance = new MadeonSamplePad();

@@ -3,6 +3,7 @@ import { PadConfig, PadType, SamplePadState } from "./MadeonSamplePad";
 //https://math.stackexchange.com/questions/2108205/function-that-maps-numbers-to-diagonal-co-ordinates
 //only works for n x n grids for now :( to get it working for m x n, I would need to add a 3rd case
 //for if the coord fell in a middle section, which wouldn't be too bad.
+//this shit was hard:( I don't even know if this is the best way to do this but it made sense in the moment
 const n = 6;
 export const getDiagonalIndexFromRowCol = (row: number, col: number) => {
   const diagonalNum = row + col;
@@ -34,6 +35,7 @@ export const getDiagonalIndexFromIndex = (index: number) => {
   return getDiagonalIndexFromRowCol(row, col);
 };
 
+//hard coded values ¯\_(ツ)_/¯
 export const getPadConfigFromIndex = (index: number): PadConfig => {
   const diagonalIndex = getDiagonalIndexFromIndex(index);
   if (diagonalIndex < 10) {
@@ -45,6 +47,7 @@ export const getPadConfigFromIndex = (index: number): PadConfig => {
   }
 };
 
+//can't a fella get an equals overload anymore!!
 export const padConfigEqual = (a: PadConfig, b: PadConfig) => {
   return a.index == b.index && a.type == b.type;
 };
@@ -54,93 +57,32 @@ export const samplePadStateContainsPadConfig = (
   padConfig: PadConfig
 ) => {
   return (
-    (samplePadState.drum.find((item) => padConfigEqual(item, padConfig)) ||
-      samplePadState.bass.find((item) => padConfigEqual(item, padConfig)) ||
-      samplePadState.sounds.find((item) => padConfigEqual(item, padConfig))) !=
-    undefined
+    samplePadState.drum.some((item) => padConfigEqual(item, padConfig)) ||
+    samplePadState.bass.some((item) => padConfigEqual(item, padConfig)) ||
+    samplePadState.sounds.some((item) => padConfigEqual(item, padConfig))
   );
 };
 
-type Predicate<T> = (a: T, b: T) => boolean;
-
-export function differenceWith<T>(
-  arr1: T[],
-  arr2: T[],
-  predicate: Predicate<T>
+//chat poo poo pee
+function combineUnique<T>(
+  list1: T[],
+  list2: T[],
+  equals: (a: T, b: T) => boolean
 ): T[] {
-  // Use a Set to keep track of elements present in both arrays
-  const commonElements = new Set<T>();
+  const combined: T[] = [];
 
-  // Find common elements based on the comparison predicate
-  for (const element1 of arr1) {
-    for (const element2 of arr2) {
-      if (predicate(element1, element2)) {
-        commonElements.add(element1);
-        commonElements.add(element2);
-      }
+  for (const item of list2) {
+    if (!list1.some((x) => equals(x, item))) {
+      combined.push(item);
+    }
+  }
+  for (const item of list1) {
+    if (!list2.some((x) => equals(x, item))) {
+      combined.push(item);
     }
   }
 
-  // Filter out elements present in both arrays
-  const differenceArray: T[] = [];
-  for (const element of arr1.concat(arr2)) {
-    if (!commonElements.has(element)) {
-      differenceArray.push(element);
-    }
-  }
-
-  return differenceArray;
-}
-
-export function intersectionWith<T>(
-  arr1: T[],
-  arr2: T[],
-  predicate: Predicate<T>
-): T[] {
-  // Use a Set to keep track of elements present in both arrays
-  const commonElements = new Set<T>();
-
-  // Find common elements based on the comparison predicate
-  for (const element1 of arr1) {
-    for (const element2 of arr2) {
-      if (predicate(element1, element2)) {
-        commonElements.add(element1);
-        commonElements.add(element2);
-      }
-    }
-  }
-
-  // Convert the set to an array and return it
-  return Array.from(commonElements);
-}
-
-export function unionWith<T>(
-  arr1: T[],
-  arr2: T[],
-  predicate: Predicate<T>
-): T[] {
-  // Concatenate both arrays
-  const mergedArray = arr1.concat(arr2);
-
-  // Use a Set to keep unique elements based on the comparison predicate
-  const uniqueElements = new Set<T>();
-
-  // Add elements to the set based on the comparison predicate
-  for (const element of mergedArray) {
-    let found = false;
-    for (const uniqueElement of uniqueElements) {
-      if (predicate(element, uniqueElement)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      uniqueElements.add(element);
-    }
-  }
-
-  // Convert the set back to an array
-  return Array.from(uniqueElements);
+  return combined;
 }
 
 export function applyPadConfigListToExistingList(
@@ -148,24 +90,11 @@ export function applyPadConfigListToExistingList(
   existingList: PadConfig[],
   maxLength: number
 ) {
-  const sharedList = intersectionWith<PadConfig>(
+  let returnList = combineUnique<PadConfig>(
     queuedList,
     existingList,
-    (a, b) => padConfigEqual(a, b)
+    padConfigEqual
   );
-
-  //filter out the similarities from both of them
-  let returnList = differenceWith<PadConfig>(sharedList, existingList, (a, b) =>
-    padConfigEqual(a, b)
-  );
-  const newQueue = differenceWith<PadConfig>(sharedList, queuedList, (a, b) =>
-    padConfigEqual(a, b)
-  );
-
-  returnList = unionWith<PadConfig>(returnList, newQueue, (a, b) =>
-    padConfigEqual(a, b)
-  );
-
   while (returnList.length > maxLength) {
     returnList.shift();
   }
@@ -197,6 +126,7 @@ export function applyQueuedStateToExistingState(
   };
 }
 
+//chat poo poo pee
 export function mapRange(
   value: number,
   inMin: number,

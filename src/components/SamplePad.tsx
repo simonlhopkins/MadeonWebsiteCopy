@@ -1,3 +1,4 @@
+import styled from "styled-components";
 import { PadConfig, SamplePadState } from "../MadeonSamplePad";
 import {
   getPadConfigFromIndex,
@@ -45,5 +46,21 @@ export default function SamplePad({
       );
     }
   }
-  return <div className="samplePadParent">{samplePads}</div>;
+  return (
+    <StyledSamplePadParent className="samplePadParent">
+      {samplePads}
+    </StyledSamplePadParent>
+  );
 }
+
+const StyledSamplePadParent = styled.div`
+  display: grid;
+  max-width: 400px;
+  grid-template-rows: repeat(6, 1fr);
+  grid-template-columns: repeat(6, 1fr);
+  transform: rotate(-45deg);
+  aspect-ratio: 1;
+  margin: auto;
+  margin-top: 130px;
+  margin-bottom: 130px;
+`;

@@ -29,7 +29,11 @@ export default function Pad({
   const overlayRef = useRef<HTMLDivElement>(null);
   const [loopStartTime, setLoopStartTime] = useState<number>(0);
   const [loopDuration, setLoopDuration] = useState<number>(0);
+  //this seems like a fucked up way to do animations in react lol but like none of the other libraries make any sense to me.
   useEffect(() => {
+    //each pad have an update callback, this is because we need to start the animation AS SOON as we can
+    //if we rely on the active prop, that will be updated ms after the loop already happened, so we would
+    //miss the first iteration of the loop
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
       (currentState, time, loopDuration) => {
         const actuallyActive = samplePadStateContainsPadConfig(
@@ -37,6 +41,8 @@ export default function Pad({
           padConfig
         );
         //actually active is what the class is giving us completely divorced from rendering
+        //I feel like i read somewhere that you shouldn't set state in a use effect block but ¯\_(ツ)_/¯
+        //Like technically it is in the callback function lol
         setLoopStartTime(time);
         setLoopDuration(loopDuration);
         if (actuallyActive) {
@@ -73,13 +79,14 @@ export default function Pad({
     };
   }, []);
 
+  //if the queued status changes, then add an animation
   useEffect(() => {
     if (queued) {
-      const nextLoopTime = loopStartTime + loopDuration;
+      const nextLoopStartTime = loopStartTime + loopDuration;
       const percentThrough = mapRange(
         MadeonSamplePadInstance.getCurrentTransportTime(),
         loopStartTime,
-        nextLoopTime,
+        nextLoopStartTime,
         0,
         1
       );
@@ -89,13 +96,6 @@ export default function Pad({
         duration: (1 - percentThrough) * loopDuration * 1000, // Duration of the animation in milliseconds
         easing: "linear", // Easing function for smooth animation
       });
-    } else {
-      // anime({
-      //   targets: overlayRef.current,
-      //   opacity: "0",
-      //   duration: 200, // Duration of the animation in milliseconds
-      //   easing: "linear", // Easing function for smooth animation
-      // });
     }
     return () => {
       anime.remove(overlayRef.current);
@@ -105,22 +105,17 @@ export default function Pad({
   return (
     <StyledPad
       $padType={padConfig.type}
-      className={`${active ? "active" : ""} ${queued ? "queued" : ""}`}
+      className={`${active && "active"} ${queued && "queued"}`}
       onClick={() => {
         onPadClick(padConfig);
       }}
       ref={divRef}
     >
-      <StyledOverlay className="overlay" ref={overlayRef}></StyledOverlay>
+      <div className="overlay" ref={overlayRef}></div>
     </StyledPad>
   );
 }
 
-const StyledOverlay = styled.div`
-  position: absolute;
-  width: 0%;
-  height: 100%;
-`;
 const StyledPad = styled.div<{ $padType: PadType }>`
   position: relative;
   background-color: ${(props) => getColorFromPadType(props.$padType, 0.8)};
@@ -139,9 +134,11 @@ const StyledPad = styled.div<{ $padType: PadType }>`
     transition: opacity 200ms;
     background-color: ${(props) => getColorFromPadType(props.$padType, 1)};
     border-right: 2px solid white;
+    position: absolute;
+    width: 0%;
+    height: 100%;
   }
   &.queued {
-    /* background-color: lightblue; */
     .overlay {
       opacity: 100%;
       transition: opacity 200ms;

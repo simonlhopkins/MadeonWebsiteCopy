@@ -25,6 +25,7 @@ function App() {
   useEffect(() => {
     const id = MadeonSamplePadInstance.addSampleLoopCallback(
       (newState: SamplePadState) => {
+        //update the UI of the app on loop. These have no bearing over what the current state of the sample pad actually is
         setCurrentSamplePadState({ ...newState });
         setQueuedSamplePadState({
           drum: [],
@@ -67,6 +68,7 @@ function App() {
     }
 
     setQueuedSamplePadState({ ...queuedSamplePadState });
+    //here is the ONLY place we should be updating what the sample pad is thinking about playing because this can be set whenever
     MadeonSamplePadInstance.setQueuedSamplePadState(queuedSamplePadState);
   };
   return (
