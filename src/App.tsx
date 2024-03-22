@@ -98,6 +98,13 @@ function App() {
         </a>{" "}
         so credit to them!
       </h2>
+      <h2>
+        I also stole the background artwork from this{" "}
+        <a href="https://soundcloud.com/porter-robinson/sad-machine-anamanaguchi-remix">
+          song on spotify!!
+        </a>
+      </h2>
+      <h3>made this for learning</h3>
     </>
   );
 }
