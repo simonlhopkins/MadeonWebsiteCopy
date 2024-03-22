@@ -65,7 +65,7 @@ export default class MadeonSamplePad {
         let newPlayer = await this.createPlayer(`sounds/ogg/${type}.1.${i}.ogg`)
           .then((result) => result.toDestination())
           .catch((e) => {
-            console.log("error loading ogg files, using mp3");
+            console.log(e);
             return this.createPlayer(`sounds/mp3/${type}.1.${i}.mp3`).then(
               (result) => result.toDestination()
             );
