@@ -126,6 +126,7 @@ const StyledPad = styled.div<{ $padType: PadType }>`
   background-color: ${(props) => getColorFromPadType(props.$padType, 0.8)};
   border: 2px solid white;
   margin: 5px;
+  cursor: "pointer";
   &.active {
     background-color: ${(props) => getColorFromPadType(props.$padType, 1)};
     .overlay {
