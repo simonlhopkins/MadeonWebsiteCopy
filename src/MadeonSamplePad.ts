@@ -60,21 +60,23 @@ export default class MadeonSamplePad {
 
   async loadSamples() {
     const loadSoundArr = async (type: string, num: number) => {
-      const ret = [];
+      const loadPromises = [];
       for (let i = 1; i < num + 1; i++) {
-        let newPlayer = await this.createPlayer(`sounds/ogg/${type}.1.${i}.ogg`)
+        let newLoadPromise = this.createPlayer(`sounds/ogg/${type}.1.${i}.ogg`)
           .then((result) => result.toDestination())
           .catch((e) => {
-            console.log(e);
+            console.log(`couldn't load ogg [${e.message}], trying mp3`);
+
             return this.createPlayer(`sounds/mp3/${type}.1.${i}.mp3`).then(
               (result) => result.toDestination()
             );
           });
+        loadPromises.push(newLoadPromise);
 
         // newPlayer.fadeOut = 0.05;
         // newPlayer.fadeIn = 0.05;
-        ret.push(newPlayer);
       }
+      let ret = await Promise.all(loadPromises);
       return ret;
     };
 
