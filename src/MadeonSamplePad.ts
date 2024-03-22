@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import { applyQueuedStateToExistingState } from "./Util";
+import { applyQueuedStateToExistingState, isSamplePadStateEmpty } from "./Util";
 
 //types
 export type SampleLoopCallbackType = (
@@ -128,6 +128,18 @@ class MadeonSamplePad {
   getCurrentTransportTime() {
     return Tone.Transport.immediate();
   }
+  getNextLoopStartTime() {
+    return Tone.Transport.nextSubdivision("2m");
+  }
+  getCurrentLoopStartTime() {
+    return Math.max(
+      0,
+      Tone.Transport.nextSubdivision("2m") - this.getLoopDuration()
+    );
+  }
+  getLoopDuration() {
+    return Tone.Transport.toSeconds("2m");
+  }
   private onSampleLoop(time: number, loopDuration: number) {
     this.currentState = applyQueuedStateToExistingState(
       this.queuedState,
@@ -135,11 +147,6 @@ class MadeonSamplePad {
     );
     //end move to a function
     //this.currentState is updated now
-
-    this.sampleLoopCallbackMap.forEach((callback) => {
-      //pass a copy of the state to each of them
-      callback({ ...this.currentState }, time, loopDuration);
-    });
 
     this.currentState.bass.forEach((config) => {
       this.getSampleFromPadConfig(config).start();
@@ -156,15 +163,16 @@ class MadeonSamplePad {
       sounds: [],
     };
     //nothing is playing
-    if (
-      this.currentState.sounds.length == 0 &&
-      this.currentState.drum.length == 0 &&
-      this.currentState.bass.length == 0
-    ) {
+    if (isSamplePadStateEmpty(this.currentState)) {
       Tone.Transport.stop();
       Tone.Transport.seconds = 0;
       this.isIdle = true;
+    } else {
     }
+    this.sampleLoopCallbackMap.forEach((callback) => {
+      //pass a copy of the state to each of them
+      callback({ ...this.currentState }, time, loopDuration);
+    });
   }
 
   async init() {
@@ -183,13 +191,13 @@ class MadeonSamplePad {
     console.log("samples loaded");
     Tone.Transport.scheduleRepeat(
       (time) => {
-        this.onSampleLoop(time, Tone.Transport.toSeconds("2m"));
+        this.onSampleLoop(time, this.getLoopDuration());
       },
       "2m",
       "0"
     );
     Tone.Transport.bpm.value = this.bpm;
-    this.onSampleLoop(0, Tone.Transport.toSeconds("2m"));
+    this.onSampleLoop(0, this.getLoopDuration());
   }
 }
 

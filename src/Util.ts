@@ -147,3 +147,11 @@ export const getColorFromPadType = (padType: PadType, opacity: number) => {
       return `rgb(242, 81, 22, ${opacity})`;
   }
 };
+
+export const isSamplePadStateEmpty = (samplePadState: SamplePadState) => {
+  return (
+    samplePadState.sounds.length == 0 &&
+    samplePadState.drum.length == 0 &&
+    samplePadState.bass.length == 0
+  );
+};
