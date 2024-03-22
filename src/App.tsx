@@ -101,7 +101,7 @@ function App() {
       <h2>
         I also stole the background artwork from this{" "}
         <a href="https://soundcloud.com/porter-robinson/sad-machine-anamanaguchi-remix">
-          song on spotify!!
+          song on soundcloud!!
         </a>
       </h2>
       <h3>made this for learning</h3>
