@@ -202,9 +202,16 @@ class MadeonSamplePad {
     }
   }
   private onSampleLoop(time: number, loopDuration: number) {
-    this.setCurrentState(
-      applyQueuedStateToExistingState(this.queuedState, this.currentState)
+    const newCurrentState = applyQueuedStateToExistingState(
+      this.queuedState,
+      this.currentState
     );
+    this.queuedState = {
+      drum: [],
+      bass: [],
+      sounds: [],
+    };
+    this.setCurrentState(newCurrentState);
     //end move to a function
     //this.currentState is updated now
 
@@ -217,11 +224,6 @@ class MadeonSamplePad {
     this.currentState.drum.forEach((config) => {
       this.getSampleFromPadConfig(config).start();
     });
-    this.queuedState = {
-      drum: [],
-      bass: [],
-      sounds: [],
-    };
 
     this.sampleLoopCallbackMap.forEach((callback) => {
       //pass a copy of the state to each of them

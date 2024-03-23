@@ -27,17 +27,15 @@ export default function SamplePad({
 
   useEffect(() => {
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
-      (currentState, _time, loopDuration) => {
-        if (!isSamplePadStateEmpty(currentState)) {
-          const keyframes = [
-            { boxShadow: "0 0 0 0px rgba(255, 255, 255, 1)" },
-            { boxShadow: "0 0 0 60px rgba(0, 0, 0, 0)" },
-          ];
-          padRef.current?.animate(keyframes, {
-            duration: (loopDuration / 8) * 1000,
-            iterations: 8,
-          });
-        }
+      (_currentState, _time, loopDuration) => {
+        const keyframes = [
+          { boxShadow: "0 0 0 0px rgba(255, 255, 255, 1)" },
+          { boxShadow: "0 0 0 60px rgba(0, 0, 0, 0)" },
+        ];
+        padRef.current?.animate(keyframes, {
+          duration: (loopDuration / 8) * 1000,
+          iterations: 8,
+        });
       }
     );
 
@@ -47,6 +45,12 @@ export default function SamplePad({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isSamplePadStateEmpty(currentSamplePadState)) {
+      padRef.current?.getAnimations().forEach((item) => item.cancel());
+    }
+  }, [currentSamplePadState]);
 
   const n = 6;
 

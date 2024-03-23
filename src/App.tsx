@@ -32,24 +32,13 @@ function App() {
     const stateUpdateCallbackID =
       MadeonSamplePadInstance.addStateUpdateCallback(
         (newState: SamplePadState, queuedState: SamplePadState) => {
+          console.log("new state: ", newState);
           setCurrentSamplePadState(newState);
-
           setQueuedSamplePadState(queuedState);
         }
       );
-    const sampleLoopCallbackID = MadeonSamplePadInstance.addSampleLoopCallback(
-      (newState: SamplePadState) => {
-        //update the UI of the app on loop. These have no bearing over what the current state of the sample pad actually is
 
-        setQueuedSamplePadState({
-          drum: [],
-          bass: [],
-          sounds: [],
-        });
-      }
-    );
     return () => {
-      MadeonSamplePadInstance.removeSampleLoopCallback(sampleLoopCallbackID);
       MadeonSamplePadInstance.removeStateUpdateCallback(stateUpdateCallbackID);
     };
   }, []);
@@ -61,6 +50,7 @@ function App() {
       queuedSamplePadState,
       padConfig
     );
+    console.log(newQueuedState);
 
     if (
       samplePadStateContainsPadConfig(currentSamplePadState, padConfig) &&
@@ -98,7 +88,9 @@ function App() {
           setImmediateStop(!immediateStop);
         }}
       />
-      <label htmlFor="immediateStop">Immediately Stop Sample</label>
+      <label style={{ backgroundColor: "black" }} htmlFor="immediateStop">
+        Immediately Stop Sample on click
+      </label>
       <SamplePad
         currentSamplePadState={currentSamplePadState}
         queuedSamplePadState={queuedSamplePadState}
