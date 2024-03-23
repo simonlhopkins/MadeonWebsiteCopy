@@ -1,5 +1,10 @@
 import * as Tone from "tone";
-import { applyQueuedStateToExistingState, isSamplePadStateEmpty } from "./Util";
+import {
+  applyPadConfigToSamplePadState,
+  applyQueuedStateToExistingState,
+  isSamplePadStateEmpty,
+  samplePadStateContainsPadConfig,
+} from "./Util";
 
 //types
 export type SampleLoopCallbackType = (
@@ -12,6 +17,10 @@ export type SamplePadState = {
   bass: PadConfig[];
   sounds: PadConfig[];
 };
+export type StateUpdateCallbackType = (
+  currentSamples: SamplePadState,
+  queuedSamples: SamplePadState
+) => void;
 
 export enum PadType {
   DRUM,
@@ -31,6 +40,9 @@ class MadeonSamplePad {
 
   private sampleLoopCallbackID = 0;
   private sampleLoopCallbackMap = new Map<number, SampleLoopCallbackType>();
+
+  private stateUpdateCallbackID = 0;
+  private stateUpdateCallbackMap = new Map<number, StateUpdateCallbackType>();
   private isIdle = true;
 
   currentState: SamplePadState = {
@@ -50,7 +62,18 @@ class MadeonSamplePad {
   constructor() {
     document.addEventListener("visibilitychange", () => {});
   }
-
+  getCurrentTransportTime() {
+    return Tone.Transport.immediate();
+  }
+  getNextLoopStartTime() {
+    return Tone.Transport.nextSubdivision("2m");
+  }
+  getCurrentLoopStartTime() {
+    return Math.max(
+      0,
+      Tone.Transport.nextSubdivision("2m") - this.getLoopDuration()
+    );
+  }
   async createPlayer(url: string): Promise<Tone.Player> {
     return new Promise((resolve, reject) => {
       const player: Tone.Player = new Tone.Player({
@@ -106,10 +129,47 @@ class MadeonSamplePad {
       Tone.Transport.start();
       this.isIdle = false;
     }
+    //in the queue, are there any items that are also currently playing
+    // const sharedElements = getIntersectionOfSamplePadStates(
+    //   newState,
+    //   this.currentState
+    // );
+    // //stop all of those
+
+    // //remove those from the queue
+    // this.queuedState = removeSampleConfigsFromState(sharedElements, newState);
+    // sharedElements.forEach((item) => {
+    //   MadeonSamplePadInstance.stopSoundImmediately(item);
+    // });
     this.queuedState = newState;
   }
 
+  stopSoundImmediately(padConfig: PadConfig) {
+    if (samplePadStateContainsPadConfig(this.currentState, padConfig)) {
+      this.getSampleFromPadConfig(padConfig).stop();
+      this.setCurrentState(
+        applyPadConfigToSamplePadState(this.currentState, padConfig)
+      );
+    }
+  }
+
   ///ehhhh
+  addStateUpdateCallback(callback: StateUpdateCallbackType) {
+    const newID = this.stateUpdateCallbackID++;
+    this.stateUpdateCallbackMap.set(newID, callback);
+    return newID;
+  }
+
+  removeStateUpdateCallback(id: number) {
+    if (this.sampleLoopCallbackMap.has(id)) {
+      this.stateUpdateCallbackMap.delete(id);
+    } else {
+      console.warn(
+        `Trying to remove an id [${id}] that is not in the loop map`
+      );
+    }
+  }
+
   addSampleLoopCallback(callback: SampleLoopCallbackType) {
     const newID = this.sampleLoopCallbackID++;
     this.sampleLoopCallbackMap.set(newID, callback);
@@ -125,25 +185,25 @@ class MadeonSamplePad {
       );
     }
   }
-  getCurrentTransportTime() {
-    return Tone.Transport.immediate();
-  }
-  getNextLoopStartTime() {
-    return Tone.Transport.nextSubdivision("2m");
-  }
-  getCurrentLoopStartTime() {
-    return Math.max(
-      0,
-      Tone.Transport.nextSubdivision("2m") - this.getLoopDuration()
-    );
-  }
+
   getLoopDuration() {
     return Tone.Transport.toSeconds("2m");
   }
+  private setCurrentState(newState: SamplePadState) {
+    this.currentState = newState;
+    this.stateUpdateCallbackMap.forEach((callback) => {
+      //pass a copy of the state to each of them
+      callback({ ...this.currentState }, { ...this.queuedState });
+    });
+    if (isSamplePadStateEmpty(this.currentState)) {
+      Tone.Transport.stop();
+      Tone.Transport.seconds = 0;
+      this.isIdle = true;
+    }
+  }
   private onSampleLoop(time: number, loopDuration: number) {
-    this.currentState = applyQueuedStateToExistingState(
-      this.queuedState,
-      this.currentState
+    this.setCurrentState(
+      applyQueuedStateToExistingState(this.queuedState, this.currentState)
     );
     //end move to a function
     //this.currentState is updated now
@@ -162,13 +222,7 @@ class MadeonSamplePad {
       bass: [],
       sounds: [],
     };
-    //nothing is playing
-    if (isSamplePadStateEmpty(this.currentState)) {
-      Tone.Transport.stop();
-      Tone.Transport.seconds = 0;
-      this.isIdle = true;
-    } else {
-    }
+
     this.sampleLoopCallbackMap.forEach((callback) => {
       //pass a copy of the state to each of them
       callback({ ...this.currentState }, time, loopDuration);

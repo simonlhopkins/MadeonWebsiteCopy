@@ -5,7 +5,11 @@ import {
   PadType,
   SamplePadState,
 } from "./MadeonSamplePad";
-import { applyPadConfigListToExistingList, getColorFromPadType } from "./Util";
+import {
+  applyPadConfigToSamplePadState,
+  getColorFromPadType,
+  samplePadStateContainsPadConfig,
+} from "./Util";
 import SamplePad from "./components/SamplePad";
 
 function App() {
@@ -22,11 +26,21 @@ function App() {
       sounds: [],
     });
 
+  const [immediateStop, setImmediateStop] = useState<boolean>(false);
+
   useEffect(() => {
-    const id = MadeonSamplePadInstance.addSampleLoopCallback(
+    const stateUpdateCallbackID =
+      MadeonSamplePadInstance.addStateUpdateCallback(
+        (newState: SamplePadState, queuedState: SamplePadState) => {
+          setCurrentSamplePadState(newState);
+
+          setQueuedSamplePadState(queuedState);
+        }
+      );
+    const sampleLoopCallbackID = MadeonSamplePadInstance.addSampleLoopCallback(
       (newState: SamplePadState) => {
         //update the UI of the app on loop. These have no bearing over what the current state of the sample pad actually is
-        setCurrentSamplePadState({ ...newState });
+
         setQueuedSamplePadState({
           drum: [],
           bass: [],
@@ -35,41 +49,29 @@ function App() {
       }
     );
     return () => {
-      MadeonSamplePadInstance.removeSampleLoopCallback(id);
+      MadeonSamplePadInstance.removeSampleLoopCallback(sampleLoopCallbackID);
+      MadeonSamplePadInstance.removeStateUpdateCallback(stateUpdateCallbackID);
     };
   }, []);
   //this is only used for queuing
   const onClick = (padConfig: PadConfig) => {
     //logic to unqueue items
 
-    switch (padConfig.type) {
-      case PadType.BASS:
-        queuedSamplePadState.bass = applyPadConfigListToExistingList(
-          [padConfig],
-          queuedSamplePadState.bass,
-          1
-        );
-        break;
-      case PadType.DRUM:
-        queuedSamplePadState.drum = applyPadConfigListToExistingList(
-          [padConfig],
-          queuedSamplePadState.drum,
-          1
-        );
-        break;
-      case PadType.SOUNDS:
-        queuedSamplePadState.sounds = applyPadConfigListToExistingList(
-          [padConfig],
-          queuedSamplePadState.sounds,
-          3 //this can be increased if you want to add wiggle room to undo all 3 and then add 3 more or something
-        );
+    const newQueuedState = applyPadConfigToSamplePadState(
+      queuedSamplePadState,
+      padConfig
+    );
 
-        break;
+    if (
+      samplePadStateContainsPadConfig(currentSamplePadState, padConfig) &&
+      immediateStop
+    ) {
+      MadeonSamplePadInstance.stopSoundImmediately(padConfig);
+    } else {
+      setQueuedSamplePadState(newQueuedState);
+      //here is the ONLY place we should be updating what the sample pad is thinking about playing because this can be set whenever
+      MadeonSamplePadInstance.setQueuedSamplePadState(newQueuedState);
     }
-
-    setQueuedSamplePadState({ ...queuedSamplePadState });
-    //here is the ONLY place we should be updating what the sample pad is thinking about playing because this can be set whenever
-    MadeonSamplePadInstance.setQueuedSamplePadState(queuedSamplePadState);
   };
   return (
     <>
@@ -88,6 +90,15 @@ function App() {
           melody
         </span>
       </h2>
+      <input
+        id="immediateStop"
+        type="checkbox"
+        checked={immediateStop}
+        onChange={() => {
+          setImmediateStop(!immediateStop);
+        }}
+      />
+      <label htmlFor="immediateStop">Immediately Stop Sample</label>
       <SamplePad
         currentSamplePadState={currentSamplePadState}
         queuedSamplePadState={queuedSamplePadState}

@@ -155,3 +155,71 @@ export const isSamplePadStateEmpty = (samplePadState: SamplePadState) => {
     samplePadState.bass.length == 0
   );
 };
+
+export function applyPadConfigToSamplePadState(
+  samplePadState: SamplePadState,
+  padConfig: PadConfig
+) {
+  const returnState = { ...samplePadState };
+  switch (padConfig.type) {
+    case PadType.BASS:
+      returnState.bass = applyPadConfigListToExistingList(
+        [padConfig],
+        returnState.bass,
+        1
+      );
+      break;
+    case PadType.DRUM:
+      returnState.drum = applyPadConfigListToExistingList(
+        [padConfig],
+        returnState.drum,
+        1
+      );
+      break;
+    case PadType.SOUNDS:
+      returnState.sounds = applyPadConfigListToExistingList(
+        [padConfig],
+        returnState.sounds,
+        3 //this can be increased if you want to add wiggle room to undo all 3 and then add 3 more or something
+      );
+
+      break;
+  }
+  return returnState;
+}
+
+export function getIntersectionOfSamplePadStates(
+  a: SamplePadState,
+  b: SamplePadState
+) {
+  const getSharedElements = (a: PadConfig[], b: PadConfig[]) => {
+    let shared: PadConfig[] = [];
+    a.forEach((item) => {
+      if (b.some((other) => padConfigEqual(item, other))) {
+        shared.push(item);
+      }
+    });
+    return shared;
+  };
+  const bass = getSharedElements(a.bass, b.bass);
+  const sounds = getSharedElements(a.sounds, b.sounds);
+  const drum = getSharedElements(a.drum, b.drum);
+  return bass.concat(sounds, drum);
+}
+
+export function removeSampleConfigsFromState(
+  padConfigs: PadConfig[],
+  state: SamplePadState
+) {
+  return {
+    drum: state.drum.filter(
+      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
+    ),
+    bass: state.bass.filter(
+      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
+    ),
+    sounds: state.sounds.filter(
+      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
+    ),
+  } as SamplePadState;
+}

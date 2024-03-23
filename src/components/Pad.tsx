@@ -29,7 +29,7 @@ export default function Pad({
   //this seems like a fucked up way to do animations in react lol but like none of the other libraries make any sense to me.
 
   useEffect(() => {
-    //each pad have an update callback, this is because we need to start the animation AS SOON as we can
+    //each pad have a sample loop callback, this is because we need to start the animation AS SOON as we can
     //if we rely on the active prop, that will be updated ms after the loop already happened, so we would
     //miss the first iteration of the loop
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
@@ -74,13 +74,17 @@ export default function Pad({
       }
     };
   }, []);
+  useEffect(() => {
+    if (!active) {
+      divRef.current?.getAnimations().forEach((item) => item.cancel());
+    }
+  }, [active]);
 
   //if the queued status changes, then add an animation
   useEffect(() => {
     if (queued) {
       const nextLoopStartTime = MadeonSamplePadInstance.getNextLoopStartTime();
       const loopStartTime = MadeonSamplePadInstance.getCurrentLoopStartTime();
-      console.log(loopStartTime, nextLoopStartTime);
       const percentThrough =
         loopStartTime < nextLoopStartTime
           ? mapRange(
