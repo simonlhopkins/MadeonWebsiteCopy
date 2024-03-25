@@ -49,7 +49,7 @@ export default function Pad({
             iterations: Infinity,
           });
         })
-        .catch((e) => {
+        .catch((_) => {
           console.log("promise aborted");
         });
     }

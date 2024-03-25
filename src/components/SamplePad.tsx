@@ -27,7 +27,7 @@ export default function SamplePad({
 
   useEffect(() => {
     const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
-      (currentState, _time, loopDuration) => {
+      (_currentState, _time, loopDuration) => {
         const keyframes = [
           { boxShadow: "0 0 0 0px rgba(255, 255, 255, 1)" },
           { boxShadow: "0 0 0 60px rgba(0, 0, 0, 0)" },
