@@ -43,7 +43,6 @@ class MadeonSamplePad {
 
   private stateUpdateCallbackID = 0;
   private stateUpdateCallbackMap = new Map<number, StateUpdateCallbackType>();
-  private isIdle = true;
 
   currentState: SamplePadState = {
     drum: [],
@@ -60,11 +59,17 @@ class MadeonSamplePad {
   debugCurrentlyPlaying: PadConfig | null = null;
 
   constructor() {
-    document.addEventListener("visibilitychange", () => {});
+    document.addEventListener("visibilitychange", () => {
+      console.log(document.visibilityState);
+    });
   }
-  getCurrentTransportTime() {
+  getImmediateTime() {
     return Tone.Transport.immediate();
   }
+  getNowTime() {
+    return Tone.Transport.now();
+  }
+
   getNextLoopStartTime() {
     return Tone.Transport.nextSubdivision("2m");
   }
@@ -125,10 +130,19 @@ class MadeonSamplePad {
   }
   async setQueuedSamplePadState(newState: SamplePadState) {
     if (!this.initialized) await this.init();
-    if (this.isIdle) {
-      Tone.Transport.start();
-      this.isIdle = false;
+    console.log(Tone.Transport.state);
+    if (Tone.context.state == "suspended") {
+      Tone.Transport.stop();
+      await Tone.context.resume();
     }
+    if (Tone.Transport.state != "started") {
+      Tone.Transport.seconds = 0;
+      Tone.Transport.start();
+    }
+    // await Tone.start();
+
+    console.log(this.getImmediateTime());
+    console.log(Tone.Transport.state);
     //in the queue, are there any items that are also currently playing
     // const sharedElements = getIntersectionOfSamplePadStates(
     //   newState,
@@ -198,7 +212,6 @@ class MadeonSamplePad {
     if (isSamplePadStateEmpty(this.currentState)) {
       Tone.Transport.stop();
       Tone.Transport.seconds = 0;
-      this.isIdle = true;
     }
   }
   private onSampleLoop(time: number, loopDuration: number) {
@@ -254,6 +267,7 @@ class MadeonSamplePad {
     );
     Tone.Transport.bpm.value = this.bpm;
     this.onSampleLoop(0, this.getLoopDuration());
+    Tone.Transport.start();
   }
 }
 
