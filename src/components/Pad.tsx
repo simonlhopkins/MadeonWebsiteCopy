@@ -4,161 +4,84 @@ import {
   MadeonSamplePadInstance,
   PadConfig,
   PadType,
+  SamplePadState,
 } from "../MadeonSamplePad";
-import { getColorFromPadType, mapRange } from "../Util";
+import {
+  getColorFromPadType,
+  samplePadStateContainsPadConfig,
+  useAddToRenderLoop,
+} from "../Util";
+import { useAppSelector } from "../store";
 
 type PadProps = {
-  active: boolean;
-  queued: boolean;
   debugText: string;
   padConfig: PadConfig;
   onPadClick: (padConfig: PadConfig) => void;
 };
-export default function Pad({
-  active,
-  queued,
-  padConfig,
-  onPadClick,
-}: PadProps) {
+export default function Pad({ padConfig, onPadClick }: PadProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   //this seems like a fucked up way to do animations in react lol but like none of the other libraries make any sense to me.
 
   //this is wayyyy simpler but could be a little bit delayed since it is not starting exactly on the next update
-  useEffect(() => {
-    if (active) {
-      const keyFrames = [
-        { transform: "scale(1)", easing: "ease-in-out", offset: 0.1 },
-        { transform: "scale(1.3)", easing: "ease-in-out", offset: 0.2 },
-        { transform: "scale(1)", easing: "ease-in-out" },
-      ];
-      const diff =
-        MadeonSamplePadInstance.getNowTime() -
-        MadeonSamplePadInstance.getCurrentLoopStartTime();
-      //accounts for the initial delay due to react, but then just loops
-      let initialAnim = divRef.current?.animate(keyFrames, {
-        duration: (MadeonSamplePadInstance.getLoopDuration() / 8 - diff) * 1000,
-        composite: "add",
-        iterations: 1,
-      });
-      initialAnim?.finished
-        .then(() => {
-          divRef.current?.animate(keyFrames, {
-            duration: (MadeonSamplePadInstance.getLoopDuration() / 8) * 1000,
-            composite: "add",
-            iterations: Infinity,
-          });
-        })
-        .catch((_) => {
-          console.log("promise aborted");
-        });
-    }
+  const currentSamples = useAppSelector(
+    (state) => state.samplePad.currentSamples
+  );
+  const queuedSamples = useAppSelector(
+    (state) => state.samplePad.queuedSamples
+  );
+  const isActive = samplePadStateContainsPadConfig(currentSamples, padConfig);
+  const isQueued = samplePadStateContainsPadConfig(queuedSamples, padConfig);
 
-    return () => {
-      divRef.current?.getAnimations().forEach((item) => item.cancel());
-    };
-  }, [active]);
+  const keyFrames = [
+    { transform: "scale(1)", easing: "ease-in-out", offset: 0.1 },
+    { transform: "scale(1.1)", easing: "ease-in-out", offset: 0.2 },
+    { transform: "scale(1)", easing: "ease-in-out" },
+  ];
+
+  useAddToRenderLoop(
+    (currentSamples: SamplePadState) => {
+      if (samplePadStateContainsPadConfig(currentSamples, padConfig)) {
+        divRef.current?.animate(keyFrames, {
+          duration: (MadeonSamplePadInstance.getLoopDuration() / 8) * 1000,
+          composite: "add",
+          iterations: 8,
+        });
+      }
+    },
+    () => {
+      if (!isActive) {
+        divRef.current?.getAnimations().forEach((i) => i.cancel());
+      }
+    },
+    [isActive]
+  );
 
   //if the queued status changes, then add an animation
+  //I think it is appropiate to observe the queue member, instead of adding to the onQueue updated callbacks
+  //because we don't need this animation start exactly when it updates in the class, unlike with active,
+  //where we need it to start exactly when it happens
   useEffect(() => {
-    if (queued) {
-      const nextLoopStartTime = MadeonSamplePadInstance.getNextLoopStartTime();
-      const loopStartTime = MadeonSamplePadInstance.getCurrentLoopStartTime();
-      const percentThrough =
-        loopStartTime < nextLoopStartTime
-          ? mapRange(
-              MadeonSamplePadInstance.getImmediateTime(),
-              loopStartTime,
-              nextLoopStartTime,
-              0,
-              1
-            )
-          : 1;
-      overlayRef.current?.animate(
+    let queuedAnim: Animation | undefined = undefined;
+    if (isQueued) {
+      const percentThrough = MadeonSamplePadInstance.getLoopProgress();
+      queuedAnim = overlayRef.current!.animate(
         { width: [`${percentThrough * 100}%`, "100%"], easing: "linear" },
         (1 - percentThrough) * MadeonSamplePadInstance.getLoopDuration() * 1000
       );
     }
     return () => {
-      overlayRef.current?.getAnimations().forEach((item) => item.cancel());
+      if (queuedAnim) {
+        queuedAnim.cancel();
+      }
     };
-  }, [queued]);
-
-  //doing it this way is technically more in sync since at the beginning of each loop it starts the anim from scratch
-  // useEffect(() => {
-  //   //each pad have a sample loop callback, this is because we need to start the animation AS SOON as we can
-  //   //if we rely on the active prop, that will be updated ms after the loop already happened, so we would
-  //   //miss the first iteration of the loop
-  //   const loopID = MadeonSamplePadInstance.addSampleLoopCallback(
-  //     (currentState, _time, loopDuration) => {
-  //       const actuallyActive = samplePadStateContainsPadConfig(
-  //         currentState,
-  //         padConfig
-  //       );
-  //       //actually active is what the class is giving us completely divorced from rendering
-  //       //I feel like i read somewhere that you shouldn't set state in a use effect block but ¯\_(ツ)_/¯
-  //       //Like technically it is in the callback function lol
-
-  //       if (actuallyActive) {
-  //         const keyFrames = [
-  //           { transform: "scale(1)", easing: "ease-in-out", offset: 0.1 },
-  //           { transform: "scale(1.3)", easing: "ease-in-out", offset: 0.2 },
-  //           { transform: "scale(1)", easing: "ease-in-out" },
-  //         ];
-  //         divRef.current?.animate(keyFrames, {
-  //           duration: (loopDuration / 8) * 1000,
-  //           iterations: 8,
-  //         });
-  //       }
-  //     }
-  //   );
-
-  //   const visibilityCallback = () => {
-  //     console.log(document.visibilityState);
-  //     if (document.visibilityState == "hidden") {
-  //       divRef.current!.getAnimations().forEach((item) => {
-  //         item.cancel();
-  //       });
-  //       divRef.current?.animate(
-  //         [
-  //           {
-  //             transform: "scale(1)",
-  //           },
-  //         ],
-  //         200
-  //       );
-  //     }
-  //   };
-  //   document.addEventListener("visibilitychange", visibilityCallback);
-
-  //   return () => {
-  //     document.removeEventListener("visibilitychange", visibilityCallback);
-  //     divRef.current!.getAnimations().forEach((item) => {
-  //       item.cancel();
-  //     });
-  //     divRef.current?.animate(
-  //       [
-  //         {
-  //           transform: "scale(1)",
-  //         },
-  //       ],
-  //       200
-  //     );
-
-  //     MadeonSamplePadInstance.removeSampleLoopCallback(loopID);
-  //   };
-  // }, []);
-  // useEffect(() => {
-  //   if (!active) {
-  //     divRef.current?.getAnimations().forEach((item) => item.cancel());
-  //   }
-  // }, [active]);
+  }, [isQueued]);
 
   return (
     <StyledPad
       $padType={padConfig.type}
       $animLength={MadeonSamplePadInstance.getLoopDuration() * 1000}
-      className={`${active ? "active" : ""} ${queued ? "queued" : ""}`}
+      className={`${isActive ? "active" : ""} ${isQueued ? "queued" : ""}`}
       onClick={() => {
         onPadClick(padConfig);
       }}
@@ -172,8 +95,8 @@ export default function Pad({
 const StyledPad = styled.div<{ $padType: PadType; $animLength: number }>`
   position: relative;
   background-color: ${(props) => getColorFromPadType(props.$padType, 0.8)};
-  border: 3px solid white;
-  margin: 5px;
+  border: 0.2rem solid white;
+  margin: 0.3rem;
   /* transform: rotate(45deg); */
   cursor: "pointer";
 

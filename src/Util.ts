@@ -1,4 +1,12 @@
-import { PadConfig, PadType, SamplePadState } from "./MadeonSamplePad";
+import { DependencyList, useEffect } from "react";
+import * as Tone from "tone";
+import {
+  MadeonSamplePadInstance,
+  PadConfig,
+  PadType,
+  SampleLoopCallbackType,
+  SamplePadState,
+} from "./MadeonSamplePad";
 
 //https://math.stackexchange.com/questions/2108205/function-that-maps-numbers-to-diagonal-co-ordinates
 //only works for n x n grids for now :( to get it working for m x n, I would need to add a 3rd case
@@ -207,19 +215,48 @@ export function getIntersectionOfSamplePadStates(
   return bass.concat(sounds, drum);
 }
 
-export function removeSampleConfigsFromState(
-  padConfigs: PadConfig[],
+export function removeSampleFromState(
+  padConfig: PadConfig,
   state: SamplePadState
 ) {
   return {
-    drum: state.drum.filter(
-      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
-    ),
-    bass: state.bass.filter(
-      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
-    ),
-    sounds: state.sounds.filter(
-      (item) => !padConfigs.some((padItem) => padConfigEqual(item, padItem))
-    ),
+    drum: state.drum.filter((item) => !padConfigEqual(item, padConfig)),
+    bass: state.bass.filter((item) => !padConfigEqual(item, padConfig)),
+    sounds: state.sounds.filter((item) => !padConfigEqual(item, padConfig)),
   } as SamplePadState;
+}
+
+export function forEachPadConfigInState(
+  state: SamplePadState,
+  lambda: (p: PadConfig) => void
+) {
+  const allPads = state.bass.concat(state.drum, state.sounds);
+  console.log(allPads);
+  allPads.forEach((item) => {
+    lambda(item);
+  });
+}
+
+export function useAddToRenderLoop(
+  callback: SampleLoopCallbackType,
+  cleanup: () => void,
+  deps: DependencyList
+) {
+  useEffect(() => {
+    const id = MadeonSamplePadInstance.addSampleLoopCallback(
+      (currentSamples, time, loopDuration) => {
+        Tone.Draw.schedule(() => {
+          callback(currentSamples, time, loopDuration);
+        }, time);
+      }
+    );
+
+    return () => {
+      MadeonSamplePadInstance.removeSampleLoopCallback(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    cleanup();
+  }, deps);
 }

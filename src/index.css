@@ -33,3 +33,18 @@ h1,
 h2 {
   background-color: black;
 }
+
+button {
+  font-family: Monospace;
+  border: 0.2rem solid black;
+  background-color: white;
+  padding: 1rem;
+  font-size: 2rem;
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+button.toggled {
+  background-color: cyan;
+}

@@ -1,10 +1,10 @@
 import * as Tone from "tone";
 import {
-  applyPadConfigToSamplePadState,
-  applyQueuedStateToExistingState,
-  isSamplePadStateEmpty,
-  samplePadStateContainsPadConfig,
-} from "./Util";
+  applyQueueToCurrent,
+  pause,
+  removePadFromCurrent,
+} from "./SamplePadSlice";
+import { store } from "./store";
 
 //types
 export type SampleLoopCallbackType = (
@@ -17,10 +17,6 @@ export type SamplePadState = {
   bass: PadConfig[];
   sounds: PadConfig[];
 };
-export type StateUpdateCallbackType = (
-  currentSamples: SamplePadState,
-  queuedSamples: SamplePadState
-) => void;
 
 export enum PadType {
   DRUM,
@@ -41,43 +37,56 @@ class MadeonSamplePad {
   private sampleLoopCallbackID = 0;
   private sampleLoopCallbackMap = new Map<number, SampleLoopCallbackType>();
 
-  private stateUpdateCallbackID = 0;
-  private stateUpdateCallbackMap = new Map<number, StateUpdateCallbackType>();
+  private mainLoop: Tone.Loop;
 
-  currentState: SamplePadState = {
-    drum: [],
-    bass: [],
-    sounds: [],
-  };
-  queuedState: SamplePadState = {
-    drum: [],
-    bass: [],
-    sounds: [],
-  };
-  bpm: number = 110;
+  private bpm: number = 110;
+  //todo make private again
   initialized = false;
   debugCurrentlyPlaying: PadConfig | null = null;
 
   constructor() {
+    this.mainLoop = new Tone.Loop((time) => {
+      this.onLoop(time, this.getLoopDuration());
+    }, this.getLoopDuration());
+
     document.addEventListener("visibilitychange", () => {
-      console.log(document.visibilityState);
+      if (document.visibilityState == "hidden") {
+        store.dispatch(pause());
+      }
+    });
+
+    let prevPlayingState = store.getState().samplePad.playingState;
+    store.subscribe(() => {
+      const newPlayingState = store.getState().samplePad.playingState;
+      if (newPlayingState != prevPlayingState) {
+        switch (newPlayingState) {
+          case "paused":
+            this.pause();
+            break;
+          case "started":
+            this.play();
+            break;
+          case "stopped":
+            this.stop();
+            break;
+        }
+
+        prevPlayingState = newPlayingState;
+      }
     });
   }
-  getImmediateTime() {
+  getTransportImmediateTime() {
     return Tone.Transport.immediate();
   }
-  getNowTime() {
+  getTransportNowTime() {
     return Tone.Transport.now();
   }
-
-  getNextLoopStartTime() {
-    return Tone.Transport.nextSubdivision("2m");
+  getContextNowTime() {
+    return Tone.now();
   }
-  getCurrentLoopStartTime() {
-    return Math.max(
-      0,
-      Tone.Transport.nextSubdivision("2m") - this.getLoopDuration()
-    );
+
+  getLoopProgress() {
+    return this.mainLoop.progress;
   }
   async createPlayer(url: string): Promise<Tone.Player> {
     return new Promise((resolve, reject) => {
@@ -85,8 +94,33 @@ class MadeonSamplePad {
         onerror: (err) => reject(err),
         onload: () => resolve(player as Tone.Player),
         url: url,
-      });
+      }).sync();
     });
+  }
+
+  pause() {
+    console.log("pause");
+    Tone.Transport.pause();
+    document.getAnimations().forEach((animation) => {
+      console.log("animation");
+      animation.pause();
+    });
+  }
+  play() {
+    Tone.Transport.start();
+    console.log("start");
+    document.getAnimations().forEach((animation) => {
+      animation.play();
+    });
+  }
+  stop() {
+    Tone.Transport.stop();
+
+    //unsync all since I think they all technically are all still events on the timeline
+    this.drumSamples.forEach((item) => item.unsync().sync());
+    this.soundSamples.forEach((item) => item.unsync().sync());
+    this.bassSamples.forEach((item) => item.unsync().sync());
+    Tone.Transport.seconds = 0;
   }
 
   async loadSamples() {
@@ -94,7 +128,13 @@ class MadeonSamplePad {
       const loadPromises = [];
       for (let i = 1; i < num + 1; i++) {
         let newLoadPromise = this.createPlayer(`sounds/ogg/${type}.1.${i}.ogg`)
+          .then((result) => {
+            // result.fadeOut = 0.05;
+            // result.fadeIn = 0.05;
+            return result;
+          })
           .then((result) => result.toDestination())
+
           .catch((e) => {
             console.log(`couldn't load ogg [${e.message}], trying mp3`);
 
@@ -103,9 +143,6 @@ class MadeonSamplePad {
             );
           });
         loadPromises.push(newLoadPromise);
-
-        // newPlayer.fadeOut = 0.05;
-        // newPlayer.fadeIn = 0.05;
       }
       let ret = await Promise.all(loadPromises);
       return ret;
@@ -128,62 +165,20 @@ class MadeonSamplePad {
         return this.soundSamples[padConfig.index];
     }
   }
-  async setQueuedSamplePadState(newState: SamplePadState) {
-    if (!this.initialized) await this.init();
-    console.log(Tone.Transport.state);
-    if (Tone.context.state == "suspended") {
-      Tone.Transport.stop();
-      await Tone.context.resume();
-    }
-    if (Tone.Transport.state != "started") {
-      Tone.Transport.seconds = 0;
-      Tone.Transport.start();
-    }
-    // await Tone.start();
-
-    console.log(this.getImmediateTime());
-    console.log(Tone.Transport.state);
-    //in the queue, are there any items that are also currently playing
-    // const sharedElements = getIntersectionOfSamplePadStates(
-    //   newState,
-    //   this.currentState
-    // );
-    // //stop all of those
-
-    // //remove those from the queue
-    // this.queuedState = removeSampleConfigsFromState(sharedElements, newState);
-    // sharedElements.forEach((item) => {
-    //   MadeonSamplePadInstance.stopSoundImmediately(item);
-    // });
-    this.queuedState = newState;
-  }
 
   stopSoundImmediately(padConfig: PadConfig) {
-    if (samplePadStateContainsPadConfig(this.currentState, padConfig)) {
-      this.getSampleFromPadConfig(padConfig).stop();
-      this.setCurrentState(
-        applyPadConfigToSamplePadState(this.currentState, padConfig)
-      );
-    }
+    this.getSampleFromPadConfig(padConfig).stop();
+    store.dispatch(removePadFromCurrent(padConfig));
   }
 
-  ///ehhhh
-  addStateUpdateCallback(callback: StateUpdateCallbackType) {
-    const newID = this.stateUpdateCallbackID++;
-    this.stateUpdateCallbackMap.set(newID, callback);
-    return newID;
+  getQueuedSamples() {
+    return store.getState().samplePad.queuedSamples;
+  }
+  getCurrentSamples() {
+    return store.getState().samplePad.currentSamples;
   }
 
-  removeStateUpdateCallback(id: number) {
-    if (this.sampleLoopCallbackMap.has(id)) {
-      this.stateUpdateCallbackMap.delete(id);
-    } else {
-      console.warn(
-        `Trying to remove an id [${id}] that is not in the loop map`
-      );
-    }
-  }
-
+  //idk a better way of doing this at the moment
   addSampleLoopCallback(callback: SampleLoopCallbackType) {
     const newID = this.sampleLoopCallbackID++;
     this.sampleLoopCallbackMap.set(newID, callback);
@@ -203,45 +198,29 @@ class MadeonSamplePad {
   getLoopDuration() {
     return Tone.Transport.toSeconds("2m");
   }
-  private setCurrentState(newState: SamplePadState) {
-    this.currentState = newState;
-    this.stateUpdateCallbackMap.forEach((callback) => {
-      //pass a copy of the state to each of them
-      callback({ ...this.currentState }, { ...this.queuedState });
-    });
-    if (isSamplePadStateEmpty(this.currentState)) {
-      Tone.Transport.stop();
-      Tone.Transport.seconds = 0;
-    }
-  }
-  private onSampleLoop(time: number, loopDuration: number) {
-    const newCurrentState = applyQueuedStateToExistingState(
-      this.queuedState,
-      this.currentState
-    );
-    this.queuedState = {
-      drum: [],
-      bass: [],
-      sounds: [],
-    };
-    this.setCurrentState(newCurrentState);
-    //end move to a function
-    //this.currentState is updated now
 
-    this.currentState.bass.forEach((config) => {
+  private onLoop(time: number, loopDuration: number) {
+    // forEachPadConfigInState(this.getCurrentSamples(), (s) => {
+    //   this.getSampleFromPadConfig(s).stop();
+    // });
+    store.dispatch(applyQueueToCurrent());
+    this.getCurrentSamples().bass.forEach((config) => {
       this.getSampleFromPadConfig(config).start();
     });
-    this.currentState.sounds.forEach((config) => {
+    this.getCurrentSamples().sounds.forEach((config) => {
       this.getSampleFromPadConfig(config).start();
     });
-    this.currentState.drum.forEach((config) => {
+    this.getCurrentSamples().drum.forEach((config) => {
       this.getSampleFromPadConfig(config).start();
     });
-
     this.sampleLoopCallbackMap.forEach((callback) => {
       //pass a copy of the state to each of them
-      callback({ ...this.currentState }, time, loopDuration);
+      callback({ ...this.getCurrentSamples() }, time, loopDuration);
     });
+
+    // Tone.Draw.schedule(() => {
+
+    // }, time);
   }
 
   async init() {
@@ -249,8 +228,8 @@ class MadeonSamplePad {
       console.log("Madeon Sample Pad Already initialized");
       return;
     }
-    console.log("initializings");
     this.initialized = true;
+    console.log("initializings");
     console.log("starting tone");
     await Tone.start();
     await Tone.context.resume();
@@ -258,19 +237,14 @@ class MadeonSamplePad {
     await this.loadSamples();
 
     console.log("samples loaded");
-    Tone.Transport.scheduleRepeat(
-      (time) => {
-        this.onSampleLoop(time, this.getLoopDuration());
-      },
-      "2m",
-      "0"
-    );
     Tone.Transport.bpm.value = this.bpm;
-    this.onSampleLoop(0, this.getLoopDuration());
-    Tone.Transport.start();
+    this.onLoop(0, this.getLoopDuration());
+    this.mainLoop.start(0);
+
+    // Tone.Transport.start();
   }
 }
 
 //Singleton :( this works for a small project like this :) Maybe can make a member of the App Component as a ref or something.
-//I need to reference it in Pad and in App
+//I need to reference it in most of the react components.
 export const MadeonSamplePadInstance = new MadeonSamplePad();

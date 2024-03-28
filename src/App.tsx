@@ -1,110 +1,99 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import styled from "styled-components";
+import { MadeonSamplePadInstance, PadConfig, PadType } from "./MadeonSamplePad";
+import { asyncAddSampleToQueue, pause, stop } from "./SamplePadSlice";
 import {
-  MadeonSamplePadInstance,
-  PadConfig,
-  PadType,
-  SamplePadState,
-} from "./MadeonSamplePad";
-import {
-  applyPadConfigToSamplePadState,
   getColorFromPadType,
   samplePadStateContainsPadConfig,
+  useAddToRenderLoop,
 } from "./Util";
+import PauseOverlay from "./components/PauseOverlay";
 import SamplePad from "./components/SamplePad";
+import { useAppDispatch, useAppSelector } from "./store";
 
 function App() {
-  const [currentSamplePadState, setCurrentSamplePadState] =
-    useState<SamplePadState>({
-      drum: [],
-      bass: [],
-      sounds: [],
-    });
-  const [queuedSamplePadState, setQueuedSamplePadState] =
-    useState<SamplePadState>({
-      drum: [],
-      bass: [],
-      sounds: [],
-    });
-
   const [immediateStop, setImmediateStop] = useState<boolean>(false);
-  const bassRef = useRef<HTMLSpanElement>(null);
+  const keyFrames = [
+    { transform: "scale(1)", easing: "ease-in-out", offset: 0.1 },
+    { transform: "scale(1.3)", easing: "ease-in-out", offset: 0.2 },
+    { transform: "scale(1)", easing: "ease-in-out" },
+  ];
 
-  const drumRef = useRef<HTMLSpanElement>(null);
+  const currentSamplePadState = useAppSelector(
+    (state) => state.samplePad.currentSamples
+  );
 
-  const soundsRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const stateUpdateCallbackID =
-      MadeonSamplePadInstance.addStateUpdateCallback(
-        (newState: SamplePadState, queuedState: SamplePadState) => {
-          console.log("new state: ", newState);
-          setCurrentSamplePadState(newState);
-          setQueuedSamplePadState(queuedState);
-        }
-      );
-    const onSampleLoopCallback = MadeonSamplePadInstance.addSampleLoopCallback(
-      (currentSamples) => {
-        const keyFrames = [
-          { transform: "scale(1)", easing: "ease-in-out", offset: 0.1 },
-          { transform: "scale(1.3)", easing: "ease-in-out", offset: 0.2 },
-          { transform: "scale(1)", easing: "ease-in-out" },
-        ];
-        const iterations = 8;
-        const options = {
-          duration:
-            (MadeonSamplePadInstance.getLoopDuration() / iterations) * 1000,
-          iterations: iterations,
-        };
-        if (currentSamples.bass.length > 0) {
-          bassRef.current?.animate(keyFrames, options);
-        }
-        if (currentSamples.drum.length > 0) {
-          drumRef.current?.animate(keyFrames, options);
-        }
-        if (currentSamples.sounds.length > 0) {
-          soundsRef.current?.animate(keyFrames, options);
-        }
+  const bassRef = useRef<HTMLDivElement>(null);
+  const drumRef = useRef<HTMLDivElement>(null);
+  const soundsRef = useRef<HTMLDivElement>(null);
+
+  const playingState = useAppSelector((store) => store.samplePad.playingState);
+
+  useAddToRenderLoop(
+    (currentSamples) => {
+      if (currentSamples.bass.length > 0) {
+        bassRef.current?.animate(keyFrames, {
+          duration: (MadeonSamplePadInstance.getLoopDuration() / 8) * 1000,
+          composite: "add",
+          iterations: 8,
+        });
       }
-    );
-    return () => {
-      MadeonSamplePadInstance.removeStateUpdateCallback(stateUpdateCallbackID);
-      MadeonSamplePadInstance.removeSampleLoopCallback(onSampleLoopCallback);
-    };
-  }, []);
+    },
+    () => {
+      bassRef.current?.getAnimations().forEach((i) => i.cancel());
+    },
+    [currentSamplePadState.bass.length > 0]
+  );
+  useAddToRenderLoop(
+    (currentSamples) => {
+      if (currentSamples.drum.length > 0) {
+        drumRef.current?.animate(keyFrames, {
+          duration: (MadeonSamplePadInstance.getLoopDuration() / 8) * 1000,
+          composite: "add",
+          iterations: 8,
+        });
+      }
+    },
+    () => {
+      drumRef.current?.getAnimations().forEach((i) => i.cancel());
+    },
+    [currentSamplePadState.drum.length > 0]
+  );
+  useAddToRenderLoop(
+    (currentSamples) => {
+      if (currentSamples.sounds.length > 0) {
+        soundsRef.current?.animate(keyFrames, {
+          duration: (MadeonSamplePadInstance.getLoopDuration() / 8) * 1000,
+          composite: "add",
+          iterations: 8,
+        });
+      }
+    },
+    () => {
+      soundsRef.current?.getAnimations().forEach((i) => i.cancel());
+    },
+    [currentSamplePadState.sounds.length > 0]
+  );
 
-  useEffect(() => {
-    if (currentSamplePadState.bass.length == 0) {
-      bassRef.current?.getAnimations().forEach((a) => a.cancel());
-    }
-    if (currentSamplePadState.drum.length == 0) {
-      drumRef.current?.getAnimations().forEach((a) => a.cancel());
-    }
-    if (currentSamplePadState.sounds.length == 0) {
-      soundsRef.current?.getAnimations().forEach((a) => a.cancel());
-    }
-  }, [currentSamplePadState]);
-  //this is only used for queuing
-  const onClick = (padConfig: PadConfig) => {
-    //logic to unqueue items
+  const loadedState = useAppSelector((state) => state.samplePad.loadedState);
+  const dispatch = useAppDispatch();
 
-    const newQueuedState = applyPadConfigToSamplePadState(
-      queuedSamplePadState,
-      padConfig
-    );
-
+  const onClick = async (padConfig: PadConfig) => {
+    if (loadedState == "pending") {
+      return;
+    }
     if (
-      samplePadStateContainsPadConfig(currentSamplePadState, padConfig) &&
-      immediateStop
+      immediateStop &&
+      samplePadStateContainsPadConfig(currentSamplePadState, padConfig)
     ) {
       MadeonSamplePadInstance.stopSoundImmediately(padConfig);
     } else {
-      setQueuedSamplePadState(newQueuedState);
-      //here is the ONLY place we should be updating what the sample pad is thinking about playing because this can be set whenever
-      MadeonSamplePadInstance.setQueuedSamplePadState(newQueuedState);
+      dispatch(asyncAddSampleToQueue(padConfig));
     }
   };
   return (
     <>
+      {playingState == "paused" && <PauseOverlay />}
       <h1>Click on a square to begin!</h1>
       <h2>
         You can have one{" "}
@@ -120,23 +109,33 @@ function App() {
           melody
         </StyledPadTypeSpan>
       </h2>
-      <input
-        id="immediateStop"
-        type="checkbox"
-        checked={immediateStop}
-        onChange={() => {
+
+      <button
+        disabled={playingState != "started"}
+        onClick={() => dispatch(pause())}
+      >
+        pause
+      </button>
+      <button
+        disabled={playingState != "started"}
+        onClick={() => {
+          dispatch(stop());
+        }}
+      >
+        stop
+      </button>
+
+      <button
+        className={immediateStop ? "toggled" : ""}
+        onClick={() => {
           setImmediateStop(!immediateStop);
         }}
-      />
-      <label
-        style={{ backgroundColor: "black", fontSize: "1rem" }}
-        htmlFor="immediateStop"
       >
-        Immediately Stop Sample on click
-      </label>
+        {immediateStop ? "instant stop samples" : "stop samples on loop"}
+      </button>
+
       <SamplePad
         currentSamplePadState={currentSamplePadState}
-        queuedSamplePadState={queuedSamplePadState}
         onPadClick={onClick}
       />
       <h2>
