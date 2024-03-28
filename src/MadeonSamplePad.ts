@@ -106,9 +106,9 @@ class MadeonSamplePad {
       animation.pause();
     });
   }
-  play() {
+  async play() {
+    await Tone.context.resume();
     Tone.Transport.start();
-    console.log("start");
     document.getAnimations().forEach((animation) => {
       animation.play();
     });

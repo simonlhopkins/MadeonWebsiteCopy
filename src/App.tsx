@@ -110,6 +110,10 @@ function App() {
         </StyledPadTypeSpan>
       </h2>
 
+      <SamplePad
+        currentSamplePadState={currentSamplePadState}
+        onPadClick={onClick}
+      />
       <button
         disabled={playingState != "started"}
         onClick={() => dispatch(pause())}
@@ -133,11 +137,6 @@ function App() {
       >
         {immediateStop ? "instant stop samples" : "stop samples on loop"}
       </button>
-
-      <SamplePad
-        currentSamplePadState={currentSamplePadState}
-        onPadClick={onClick}
-      />
       <h2>
         This was 100% stolen from{" "}
         <a href="https://adventuremachine.4thfloorcreative.co.uk/adventuremachine/?t=5,16,34">
