@@ -153,6 +153,11 @@ function App() {
 
       <h2>made by Simon for learning the Web Audio Api</h2>
       <p>
+        <a href="https://github.com/simonlhopkins/MadeonWebsiteCopy">
+          link project to github
+        </a>
+      </p>
+      <p>
         I made this all using react (idk why really it was very hard to reason
         about perfectly timing animations when the whole rerender situation is
         so slow -__-) and <a href="https://tonejs.github.io/">Tone.js</a> which
@@ -205,6 +210,13 @@ const StyledPadTypeSpan = styled.span<{ $padType: PadType }>`
 const StyledAppWrapper = styled.div`
   width: 100%;
   height: 100%;
+
+  a {
+    color: cyan;
+  }
+  a:visited {
+    color: cyan;
+  }
 `;
 
 export default App;
