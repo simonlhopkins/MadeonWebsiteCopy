@@ -19,7 +19,7 @@ export default function PauseOverlay() {
 
 const StyledPauseOverlay = styled.div`
   width: 100svw;
-  height: 100svh;
+  height: 100vh;
   position: fixed;
   display: flex;
   align-items: center;
