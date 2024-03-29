@@ -210,13 +210,7 @@ const StyledPadTypeSpan = styled.span<{ $padType: PadType }>`
 const StyledAppWrapper = styled.div`
   width: 100%;
   height: 100%;
-
-  a {
-    color: cyan;
-  }
-  a:visited {
-    color: cyan;
-  }
+  /* overflow-x: hidden; */
 `;
 
 export default App;

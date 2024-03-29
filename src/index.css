@@ -14,7 +14,6 @@
 }
 #root {
   margin: 0 auto;
-  padding: 2rem;
   text-align: center;
   max-width: 70%;
 }
@@ -22,7 +21,7 @@
 body {
   margin: 0;
   display: flex;
-
+  overflow: hidden;
   min-width: 320px;
   min-height: 100vh;
   background-image: url("/images/mysterious_stone.jpg");

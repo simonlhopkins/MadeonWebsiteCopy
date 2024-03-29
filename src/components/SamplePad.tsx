@@ -95,7 +95,7 @@ export default function SamplePad({ onPadClick }: SamplePadProps) {
 
 const StyledSamplePadParent = styled.div`
   display: grid;
-  max-width: 400px;
+  max-width: 300px;
 
   grid-template-rows: repeat(6, 1fr);
   grid-template-columns: repeat(6, 1fr);
@@ -106,6 +106,7 @@ const StyledSamplePadParent = styled.div`
   margin-bottom: 130px;
 
   .overlayScreen {
+    overflow: hidden;
     pointer-events: none;
     position: absolute;
     height: 100%;
