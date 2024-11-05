@@ -38,6 +38,7 @@ button {
   font-family: Monospace;
   border: 0.2rem solid black;
   background-color: white;
+  color: black;
   padding: 1rem;
   font-size: 2rem;
   &:disabled {
