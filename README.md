@@ -1,5 +1,4 @@
-Copy of this website!!
+[Copy of this website!!]([url](https://adventuremachine.4thfloorcreative.co.uk/adventuremachine/))
 
-https://adventuremachine.4thfloorcreative.co.uk/adventuremachine/?t=5,16,34
 
 check it out here ⁺‧₊˚ ཐི⋆ https://madeonwebsitecopy.netlify.app/ ⋆ཋྀ ˚₊‧⁺
